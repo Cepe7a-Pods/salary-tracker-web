@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Зарплата">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="manifest.json">
+<title>Учёт зарплаты</title>
+<style>
+  :root {
+    --bg: #121212;
+    --surface: #1e1e1e;
+    --surface2: #2a2a2a;
+    --primary: #7c9fcf;
+    --primary-dim: rgba(124,159,207,0.15);
+    --text: #e0e0e0;
+    --text-dim: rgba(224,224,224,0.5);
+    --text-faint: rgba(224,224,224,0.25);
+    --green: #4caf50;
+    --yellow: #ffc107;
+    --red: #f44336;
+    --border: rgba(255,255,255,0.1);
+    --radius: 12px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+  #app { max-width: 480px; margin: 0 auto; padding: 12px 16px; }
+  h1 { text-align: center; font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+  .year-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .year-btn { background: none; border: none; color: var(--text-dim); font-size: 15px; padding: 8px; cursor: pointer; }
+  .year-label { font-size: 20px; font-weight: 700; color: var(--primary); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .tab { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 14px; color: var(--text); cursor: pointer; transition: all .15s; }
+  .tab.active { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: pointer; }
+  .card-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-full { background: var(--green); }
+  .dot-partial { background: var(--yellow); }
+  .dot-empty { background: var(--text-faint); }
+  .dot-vacation { background: var(--green); }
+  .card-date { font-size: 12px; color: var(--text-dim); }
+  .days-header { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 4px; }
+  .day-label { text-align: center; font-size: 10px; color: var(--text-dim); }
+  .day-date { text-align: center; font-size: 9px; color: var(--text-faint); }
+  .days-input { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 4px; }
+  .day-cell { background: var(--surface2); border-radius: 4px; height: 34px; border: 1px solid transparent; transition: border .15s; }
+  .day-cell input { width: 100%; height: 100%; background: none; border: none; text-align: center; color: var(--text); font-size: 12px; font-weight: 600; outline: none; padding: 0 2px; }
+  .day-cell input::placeholder { color: var(--text-faint); font-weight: 400; }
+  .day-cell.focused { border-color: var(--primary); }
+  .days-income { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 6px; }
+  .day-income { text-align: center; font-size: 8px; color: var(--primary); font-weight: 500; }
+  .day-income.zero { color: var(--text-faint); }
+  .total-row { font-size: 13px; font-weight: 600; color: var(--primary); }
+  .month-bar { background: var(--surface); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .month-label { font-size: 12px; color: var(--text-dim); }
+  .month-value { font-size: 14px; font-weight: 600; color: var(--primary); }
+  .btn { display: block; width: 100%; padding: 10px; border-radius: var(--radius); border: 1.5px solid var(--border); background: none; color: var(--text); font-size: 14px; cursor: pointer; text-align: center; margin-bottom: 8px; transition: all .15s; }
+  .btn:active { background: var(--primary-dim); }
+  .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+  .btn-danger { border-color: var(--red); color: var(--red); }
+  .section { background: var(--surface); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+  .section-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; }
+  .section-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .section-icon { font-size: 18px; }
+  .section-body { padding: 0 16px 14px; display: none; }
+  .section-body.open { display: block; }
+  .radio-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; font-size: 15px; }
+  .radio-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .radio-dot.checked { border-color: var(--primary); background: var(--primary); }
+  .radio-dot.checked::after { content:''; width:6px; height:6px; border-radius:50%; background:#fff; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .chip { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 13px; color: var(--text); cursor: pointer; }
+  .chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 4px; margin-top: 10px; }
+  input[type=text], input[type=number], input[type=date] { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 14px; outline: none; }
+  input[type=text]:focus, input[type=number]:focus, input[type=date]:focus { border-color: var(--primary); }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; display: flex; align-items: flex-end; justify-content: center; }
+  .modal { background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; width: 100%; max-width: 480px; padding: 20px 16px; padding-bottom: calc(20px + var(--safe-bottom)); max-height: 80vh; overflow-y: auto; }
+  .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-btns .btn { flex: 1; margin: 0; }
+  .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .stat-row:last-child { border: none; }
+  .stat-dim { color: var(--text-dim); }
+  .stat-bold { font-weight: 700; }
+  .year-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; scrollbar-width: none; }
+  .year-chips::-webkit-scrollbar { display: none; }
+  .months-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .months-table th { text-align: left; padding: 8px 4px; color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .months-table td { padding: 9px 4px; border-bottom: 1px solid var(--border); }
+  .months-table tr.dim td { color: var(--text-dim); }
+  .status-msg { font-size: 12px; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: var(--surface2); }
+  .status-ok { color: var(--green); }
+  .status-err { color: var(--red); }
+  .vacation-badge { font-size: 13px; font-weight: 600; color: var(--primary); }
+  .fixed-badge { font-size: 13px; font-weight: 600; color: var(--primary); }
+  .install-hint { background: var(--primary-dim); border: 1px solid var(--primary); border-radius: 10px; padding: 10px 12px; font-size: 12px; color: var(--primary); margin-bottom: 12px; line-height: 1.5; }
+  .separator { height: 1px; background: var(--border); margin: 10px 0; }
+  .tier-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .tier-info { font-size: 13px; }
+  .tier-delete { background: none; border: none; color: var(--red); font-size: 13px; cursor: pointer; padding: 4px 8px; }
+  .empty-msg { color: var(--text-dim); font-size: 13px; padding: 8px 0; }
+  .pager-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .pager-btn { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); padding: 6px 16px; font-size: 14px; cursor: pointer; }
+  .pager-info { font-size: 13px; color: var(--text-dim); }
+  #toast { position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Учёт зарплаты</h1>
+  <div id="install-hint" class="install-hint" style="display:none">
+    📱 Чтобы установить как приложение: нажмите кнопку «Поделиться» в Safari → «На экран «Домой»»
+  </div>
+  <div class="year-row">
+    <button class="year-btn" onclick="changeYear(-1)" id="prev-year">◀ 2025</button>
+    <span class="year-label" id="year-label">Год: 2026</span>
+    <button class="year-btn" onclick="changeYear(1)" id="next-year">2027 ▶</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('weeks')">Неделя</div>
+    <div class="tab" onclick="switchTab('stats')">Статистика</div>
+    <div class="tab" onclick="switchTab('settings')">Настройки</div>
+  </div>
+  <div id="tab-weeks"></div>
+  <div id="tab-stats" style="display:none"></div>
+  <div id="tab-settings" style="display:none"></div>
+</div>
+
+<!-- Модальные окна -->
+<div id="modal-week" class="modal-overlay" style="display:none" onclick="closeModal('week')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modal-week-title">Неделя</h3>
+    <div id="modal-week-content"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('week')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveWeekModal()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-tier" class="modal-overlay" style="display:none" onclick="closeModal('tier')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Добавить ставку</h3>
+    <label>Дата начала</label>
+    <input type="date" id="tier-date">
+    <label>Ставка до 40ч (руб/ч)</label>
+    <input type="number" id="tier-base" placeholder="430">
+    <label>Ставка сверх 40ч (руб/ч)</label>
+    <input type="number" id="tier-overtime" placeholder="550">
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('tier')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveTier()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-vacation-settings" class="modal-overlay" style="display:none" onclick="closeModal('vacation-settings')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Параметры отпуска</h3>
+    <label>Дата начала</label>
+    <input type="date" id="vs-date">
+    <label>Сумма в неделю (руб)</label>
+    <input type="number" id="vs-weekly" placeholder="18000">
+    <label>Оплачиваемых дней в год</label>
+    <input type="number" id="vs-days" placeholder="10">
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('vacation-settings')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveVacationSettings()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-vacation-period" class="modal-overlay" style="display:none" onclick="closeModal('vacation-period')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Добавить отпуск</h3>
+    <label>Дата начала</label>
+    <input type="date" id="vp-start">
+    <label>Дата окончания</label>
+    <input type="date" id="vp-end">
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('vacation-period')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveVacationPeriod()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+// ДАННЫЕ / ХРАНИЛИЩЕ
+// ══════════════════════════════════════════════════════════════════════
+
+const DB_KEY = 'salary_tracker_data';
+let db = loadDB();
+
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {
+    salaryTiers: [{ startDateEpochDay: toEpochDay('2025-12-29'), baseRatePerHourKopecks: 43000, overtimeRatePerHourKopecks: 55000 }],
+    vacationSettingsList: [{ startDateEpochDay: toEpochDay('2025-12-29'), weeklyAmountKopecks: 1800000, paidWorkDaysPerYear: 10 }],
+    vacationPeriods: [],
+    weeksByYear: {},
+    scrollToCurrentWeek: false,
+    weekDisplayMode: 'LIST'
+  };
+}
+
+function saveDB() {
+  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// УТИЛИТЫ ДАТ
+// ══════════════════════════════════════════════════════════════════════
+
+function toEpochDay(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return Math.floor(d.getTime() / 86400000);
+}
+
+function fromEpochDay(epochDay) {
+  const d = new Date(epochDay * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDate(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  return `${d}.${m}.${y.slice(2)}`;
+}
+
+function formatDateFull(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  return `${d}.${m}.${y}`;
+}
+
+function getDayOfWeek(dateStr) {
+  // 1=Mon, 7=Sun
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.getDay() === 0 ? 7 : d.getDay();
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function getMondayOfWeek(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay() === 0 ? 7 : d.getDay();
+  d.setDate(d.getDate() - (dow - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+function compareDates(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
+
+function dateInRange(date, start, end) { return date >= start && date <= end; }
+
+const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MONTH_GEN = ['в январе','в феврале','в марте','в апреле','в мае','в июне','в июле','в августе','в сентябре','в октябре','в ноябре','в декабре'];
+const DAY_LABELS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+// ══════════════════════════════════════════════════════════════════════
+// ГЕНЕРАЦИЯ НЕДЕЛЬ
+// ══════════════════════════════════════════════════════════════════════
+
+function generateWeeksForYear(year) {
+  const firstDay = `${year}-01-01`;
+  const lastDay = `${year}-12-31`;
+  const start = getMondayOfWeek(firstDay);
+  const weeks = [];
+  let current = start;
+  let weekId = 1;
+  while (current <= lastDay) {
+    const end = addDays(current, 6);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(current, i);
+      days.push({ dateStr: date, dayIndex: i, workedMinutes: i === 6 ? 0 : null });
+    }
+    weeks.push({ weekId, year, startDate: current, endDate: end, mode: 'HOURS', fixedAmountKopecks: null, days });
+    current = addDays(current, 7);
+    weekId++;
+  }
+  return weeks;
+}
+
+function getWeeksForYear(year) {
+  const key = String(year);
+  if (!db.weeksByYear[key]) {
+    db.weeksByYear[key] = generateWeeksForYear(year);
+  } else {
+    // Патч: воскресенье = 0 если null (для импортированных данных)
+    db.weeksByYear[key].forEach(week => {
+      week.days.forEach(day => {
+        if (day.dayIndex === 6 && day.workedMinutes === null) day.workedMinutes = 0;
+      });
+    });
+  }
+  return db.weeksByYear[key];
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// РАСЧЁТ ЗАРПЛАТЫ
+// ══════════════════════════════════════════════════════════════════════
+
+function getActiveTier(date) {
+  const tiers = [...db.salaryTiers].sort((a, b) => b.startDateEpochDay - a.startDateEpochDay);
+  const epochDay = toEpochDay(date);
+  for (const t of tiers) {
+    if (t.startDateEpochDay <= epochDay) return t;
+  }
+  return tiers[tiers.length - 1] || { baseRatePerHourKopecks: 43000, overtimeRatePerHourKopecks: 55000 };
+}
+
+function getActiveVacationSettings(date) {
+  const list = [...db.vacationSettingsList].sort((a, b) => b.startDateEpochDay - a.startDateEpochDay);
+  const epochDay = toEpochDay(date);
+  for (const s of list) {
+    if (s.startDateEpochDay <= epochDay) return s;
+  }
+  return list[list.length - 1] || { weeklyAmountKopecks: 1800000, paidWorkDaysPerYear: 10 };
+}
+
+function isVacationDay(dateStr) {
+  return db.vacationPeriods.some(p => dateInRange(dateStr, fromEpochDay(p.startDateEpochDay), fromEpochDay(p.endDateEpochDay)));
+}
+
+function getVacationPeriodForDate(dateStr) {
+  return db.vacationPeriods.find(p => dateInRange(dateStr, fromEpochDay(p.startDateEpochDay), fromEpochDay(p.endDateEpochDay)));
+}
+
+function calculateWeek(week) {
+  if (week.mode === 'FIXED') {
+    return { totalIncomeKopecks: week.fixedAmountKopecks || 0, totalWorkedMinutes: 0, dayResults: [] };
+  }
+  // Check if vacation week
+  const isVacWk = db.vacationPeriods.some(p => {
+    const ps = fromEpochDay(p.startDateEpochDay), pe = fromEpochDay(p.endDateEpochDay);
+    return week.startDate <= pe && week.endDate >= ps;
+  });
+  if (isVacWk) {
+    const dayResults = week.days.map(day => {
+      const vp = getVacationPeriodForDate(day.dateStr);
+      if (vp && day.dayIndex < 5) { // Mon-Fri only
+        const daily = Math.floor(vp.lockedWeeklyAmountKopecks / 5);
+        return { date: day.dateStr, incomeKopecks: daily, workedMinutes: 0 };
+      }
+      return { date: day.dateStr, incomeKopecks: 0, workedMinutes: 0 };
+    });
+    const totalIncome = dayResults.reduce((s, d) => s + d.incomeKopecks, 0);
+    return { totalIncomeKopecks: totalIncome, totalWorkedMinutes: 0, dayResults };
+  }
+
+  // HOURS mode
+  const tier = getActiveTier(week.startDate);
+  const totalMinutes = week.days.reduce((s, d) => s + (d.workedMinutes || 0), 0);
+  const totalHours = totalMinutes / 60;
+  const baseRate = tier.baseRatePerHourKopecks;
+  const overtimeRate = tier.overtimeRatePerHourKopecks;
+
+  let weekIncomeKopecks = 0;
+  if (totalHours <= 40) {
+    weekIncomeKopecks = Math.round(totalHours * baseRate);
+  } else {
+    weekIncomeKopecks = Math.round(40 * baseRate + (totalHours - 40) * overtimeRate);
+  }
+
+  // Distribute income proportionally by hours
+  const dayResults = week.days.map(day => {
+    const mins = day.workedMinutes || 0;
+    let inc = 0;
+    if (totalMinutes > 0) {
+      inc = Math.round(weekIncomeKopecks * mins / totalMinutes);
+    }
+    return { date: day.dateStr, incomeKopecks: inc, workedMinutes: mins };
+  });
+
+  return { totalIncomeKopecks: weekIncomeKopecks, totalWorkedMinutes: totalMinutes, dayResults };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// СТАТУС НЕДЕЛИ
+// ══════════════════════════════════════════════════════════════════════
+
+function getWeekStatus(week) {
+  const isVac = db.vacationPeriods.some(p => {
+    const ps = fromEpochDay(p.startDateEpochDay), pe = fromEpochDay(p.endDateEpochDay);
+    return week.startDate <= pe && week.endDate >= ps;
+  });
+  if (isVac) return 'vacation';
+  if (week.mode === 'FIXED') return week.fixedAmountKopecks != null ? 'full' : 'empty';
+  const workDays = week.days.filter(d => d.dayIndex !== 6);
+  const filled = workDays.filter(d => d.workedMinutes !== null).length;
+  if (filled === 0) return 'empty';
+  if (filled === workDays.length) return 'full';
+  return 'partial';
+}
+
+function dotClass(status) {
+  return { full: 'dot-full', partial: 'dot-partial', empty: 'dot-empty', vacation: 'dot-vacation' }[status] || 'dot-empty';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ФОРМАТИРОВАНИЕ
+// ══════════════════════════════════════════════════════════════════════
+
+function fmtRub(kopecks) {
+  return (kopecks / 100).toFixed(2).replace('.', ',') + ' руб';
+}
+
+function fmtHrs(minutes) {
+  return (minutes / 60).toFixed(2).replace('.', ',');
+}
+
+function fmtDayIncome(kopecks) {
+  const r = Math.floor(kopecks / 100);
+  return r === 0 ? '0₽' : r + '₽';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+// ══════════════════════════════════════════════════════════════════════
+
+let currentYear = new Date().getFullYear();
+let currentTab = 'weeks';
+let currentPagerIdx = 0;
+let currentWeekMode = 'list'; // 'list' or 'pager'
+
+function changeYear(delta) {
+  currentYear += delta;
+  currentPagerIdx = findInitialWeekIdx();
+  render();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  render();
+}
+
+function findInitialWeekIdx() {
+  const weeks = getWeeksForYear(currentYear);
+  const today = new Date().toISOString().slice(0, 10);
+  const todayYear = new Date().getFullYear();
+  if (db.scrollToCurrentWeek && currentYear === todayYear) {
+    const idx = weeks.findIndex(w => today >= w.startDate && today <= w.endDate);
+    if (idx >= 0) return idx;
+  }
+  const idx = weeks.findIndex(w => {
+    if (w.mode === 'FIXED') return w.fixedAmountKopecks === null;
+    return w.days.filter(d => d.dayIndex !== 6).some(d => d.workedMinutes === null);
+  });
+  return idx >= 0 ? idx : 0;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// РЕНДЕР НЕДЕЛЬ
+// ══════════════════════════════════════════════════════════════════════
+
+function renderWeeks() {
+  const weeks = getWeeksForYear(currentYear);
+  let html = '';
+
+  if (currentWeekMode === 'list') {
+    // Кнопка переключения
+    html += `<button class="btn" style="margin-bottom:10px" onclick="currentWeekMode='pager';currentPagerIdx=findInitialWeekIdx();render()">По одной неделе</button>`;
+    weeks.forEach((week, idx) => {
+      html += renderWeekCard(week, idx, false);
+    });
+  } else {
+    html += `<button class="btn" style="margin-bottom:10px" onclick="currentWeekMode='list';render()">Показать списком</button>`;
+    html += `<div class="pager-nav">
+      <button class="pager-btn" onclick="pagerGo(-1)">◀</button>
+      <span class="pager-info">Неделя ${currentPagerIdx + 1} из ${weeks.length}</span>
+      <button class="pager-btn" onclick="pagerGo(1)">▶</button>
+    </div>`;
+    if (weeks[currentPagerIdx]) {
+      html += renderWeekCard(weeks[currentPagerIdx], currentPagerIdx, true);
+      html += renderMonthBar(weeks[currentPagerIdx]);
+    }
+  }
+  document.getElementById('tab-weeks').innerHTML = html;
+}
+
+function pagerGo(delta) {
+  const weeks = getWeeksForYear(currentYear);
+  currentPagerIdx = Math.max(0, Math.min(weeks.length - 1, currentPagerIdx + delta));
+  render();
+}
+
+function renderWeekCard(week, idx, withInput) {
+  const status = getWeekStatus(week);
+  const result = calculateWeek(week);
+  const isVac = status === 'vacation';
+  let content = '';
+
+  if (isVac) {
+    const vp = db.vacationPeriods.find(p => {
+      const ps = fromEpochDay(p.startDateEpochDay), pe = fromEpochDay(p.endDateEpochDay);
+      return week.startDate <= pe && week.endDate >= ps;
+    });
+    const dailyKop = vp ? Math.floor(vp.lockedWeeklyAmountKopecks / 5) : 0;
+    content += `<div class="vacation-badge">Отпуск • Доход: ${fmtRub(result.totalIncomeKopecks)}</div>`;
+    if (dailyKop > 0) {
+      content += `<div class="days-header">` + week.days.map(d => `<div class="day-label">${DAY_LABELS[d.dayIndex]}</div>`).join('') + `</div>`;
+      content += `<div class="days-income">` + week.days.map(d => {
+        const inc = d.dayIndex < 5 && isVacationDay(d.dateStr) ? dailyKop : 0;
+        return `<div class="day-income ${inc === 0 ? 'zero' : ''}">${fmtDayIncome(inc)}</div>`;
+      }).join('') + `</div>`;
+    }
+  } else if (week.mode === 'FIXED') {
+    const a = week.fixedAmountKopecks != null ? fmtRub(week.fixedAmountKopecks) : '—';
+    content += `<div class="fixed-badge">Фикс. сумма: ${a}</div>`;
+    content += `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">Нажмите на заголовок чтобы изменить</div>`;
+  } else {
+    // Days header
+    content += `<div class="days-header">` + week.days.map(d => `<div><div class="day-label">${DAY_LABELS[d.dayIndex]}</div><div class="day-date">${d.dateStr.slice(5).replace('-','.')}</div></div>`).join('') + `</div>`;
+    if (withInput) {
+      // Input cells
+      content += `<div class="days-input">` + week.days.map((d, di) => {
+        const val = d.workedMinutes !== null && d.workedMinutes !== undefined ? (d.workedMinutes % 60 === 0 ? String(d.workedMinutes / 60) : (d.workedMinutes / 60).toFixed(2)) : '';
+        const imeNext = d.dayIndex < 5 ? 'next' : 'done';
+        return `<div class="day-cell" id="cell-${idx}-${di}">
+          <input type="number" inputmode="decimal" step="0.25" min="0" max="24" placeholder="—"
+            value="${val}"
+            onfocus="this.parentElement.classList.add('focused')"
+            onblur="this.parentElement.classList.remove('focused');saveDay(${idx},${di},this.value)"
+            onkeydown="if(event.key==='Enter'){this.blur();${d.dayIndex < 5 ? `focusNextDay(${idx},${di})` : ''}}"
+            enterkeyhint="${imeNext}">
+        </div>`;
+      }).join('') + `</div>`;
+    } else {
+      // Read-only cells
+      content += `<div class="days-input">` + week.days.map(d => {
+        const val = d.workedMinutes !== null ? (d.workedMinutes % 60 === 0 ? String(d.workedMinutes / 60) : (d.workedMinutes / 60).toFixed(2)) : '';
+        return `<div class="day-cell"><input type="number" value="${val}" placeholder="—" readonly style="cursor:default"></div>`;
+      }).join('') + `</div>`;
+    }
+    // Income row
+    content += `<div class="days-income">` + week.days.map(d => {
+      const dr = result.dayResults.find(r => r.date === d.dateStr);
+      const inc = dr ? dr.incomeKopecks : 0;
+      return `<div class="day-income ${inc === 0 ? 'zero' : ''}">${fmtDayIncome(inc)}</div>`;
+    }).join('') + `</div>`;
+    content += `<div class="total-row">Часов: ${fmtHrs(result.totalWorkedMinutes)} • Доход: ${fmtRub(result.totalIncomeKopecks)}</div>`;
+  }
+
+  const headerClick = withInput ? `openWeekModal(${idx})` : ``;
+  return `<div class="card">
+    <div class="card-header" onclick="${headerClick}">
+      <div class="card-title"><div class="dot ${dotClass(status)}"></div>Неделя №${week.weekId}</div>
+      <div class="card-date">${formatDate(week.startDate)} – ${formatDate(week.endDate)}</div>
+    </div>
+    ${content}
+  </div>`;
+}
+
+function renderMonthBar(week) {
+  const months = [...new Set(week.days.map(d => d.dateStr.slice(0, 7)))].sort();
+  let html = '';
+  months.forEach(ym => {
+    const [y, m] = ym.split('-').map(Number);
+    const income = calcMonthIncome(y, m);
+    html += `<div class="month-bar"><span class="month-label">заработано ${MONTH_GEN[m-1]}:</span><span class="month-value">${fmtRub(income)}</span></div>`;
+  });
+  return html;
+}
+
+function calcMonthIncome(year, month) {
+  const weeks = getWeeksForYear(year);
+  let total = 0;
+  weeks.forEach(week => {
+    const result = calculateWeek(week);
+    if (week.mode === 'FIXED') {
+      const daysInMonth = week.days.filter(d => {
+        const [dy, dm] = d.dateStr.slice(0,7).split('-').map(Number);
+        return dy === year && dm === month;
+      }).length;
+      if (daysInMonth > 0) total += Math.floor(result.totalIncomeKopecks * daysInMonth / 7);
+    } else {
+      result.dayResults.forEach(dr => {
+        const [dy, dm] = dr.date.slice(0,7).split('-').map(Number);
+        if (dy === year && dm === month) total += dr.incomeKopecks;
+      });
+    }
+  });
+  return total;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// РЕНДЕР СТАТИСТИКИ
+// ══════════════════════════════════════════════════════════════════════
+
+function renderStats() {
+  const availableYears = getAvailableYears();
+  let html = `<div class="year-chips" id="stat-years">`;
+  availableYears.forEach(y => {
+    html += `<div class="chip ${y === currentYear ? 'active' : ''}" onclick="currentYear=${y};render()">${y}</div>`;
+  });
+  html += `</div>`;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const months = [];
+  let totalIncome = 0, totalMinutes = 0, completedCount = 0;
+
+  for (let m = 1; m <= 12; m++) {
+    const inc = calcMonthIncome(currentYear, m);
+    const mins = calcMonthMinutes(currentYear, m);
+    const hasData = inc > 0;
+    const isPast = `${currentYear}-${String(m).padStart(2,'0')}` < today.slice(0, 7);
+    const isCompleted = isPast && hasData;
+    if (hasData) {
+      totalIncome += inc;
+      totalMinutes += mins;
+      if (isCompleted) completedCount++;
+    }
+    months.push({ month: m, income: inc, minutes: mins, hasData, isCompleted });
+  }
+
+  const avg = completedCount > 0 ? Math.floor(totalIncome / completedCount) : 0;
+  html += `<div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px">Итоги ${currentYear} года</div>
+    <div class="stat-row"><span>Общий доход:</span><span class="stat-bold">${fmtRub(totalIncome)}</span></div>
+    ${totalMinutes > 0 ? `<div class="stat-row"><span>Всего часов:</span><span class="stat-bold">${fmtHrs(totalMinutes)}</span></div>` : ''}
+    <div class="stat-row"><span>Завершённых месяцев:</span><span class="stat-bold">${completedCount}</span></div>
+    ${avg > 0 ? `<div class="stat-row"><span>Средний доход/мес:</span><span class="stat-bold">${fmtRub(avg)}</span></div>` : ''}
+  </div>`;
+
+  const visibleMonths = months.filter(m => m.hasData);
+  if (visibleMonths.length > 0) {
+    html += `<div class="card"><table class="months-table">
+      <tr><th>Месяц</th><th style="text-align:right">Доход</th><th style="text-align:right">Часы</th></tr>`;
+    visibleMonths.forEach(m => {
+      const dimClass = m.isCompleted ? '' : 'dim';
+      html += `<tr class="${dimClass}">
+        <td>${MONTH_NAMES[m.month-1]}</td>
+        <td style="text-align:right">${(m.income/100).toFixed(2).replace('.',',')}</td>
+        <td style="text-align:right">${m.minutes > 0 ? fmtHrs(m.minutes) : '—'}</td>
+      </tr>`;
+    });
+    html += `</table></div>`;
+  }
+
+  document.getElementById('tab-stats').innerHTML = html;
+}
+
+function calcMonthMinutes(year, month) {
+  const weeks = getWeeksForYear(year);
+  let total = 0;
+  weeks.forEach(week => {
+    const result = calculateWeek(week);
+    result.dayResults.forEach(dr => {
+      const [dy, dm] = dr.date.slice(0,7).split('-').map(Number);
+      if (dy === year && dm === month) total += dr.workedMinutes;
+    });
+  });
+  return total;
+}
+
+function getAvailableYears() {
+  const cur = new Date().getFullYear();
+  const years = [cur];
+  for (let y = 2019; y < cur; y++) {
+    const weeks = db.weeksByYear[String(y)];
+    if (!weeks) continue;
+    const hasData = weeks.some(w => {
+      if (w.mode === 'FIXED') return w.fixedAmountKopecks != null;
+      return w.days.some(d => d.dayIndex !== 6 && d.workedMinutes !== null);
+    });
+    const hasVac = db.vacationPeriods.some(p => {
+      const ps = fromEpochDay(p.startDateEpochDay);
+      return ps.startsWith(String(y));
+    });
+    if (hasData || hasVac) years.unshift(y);
+  }
+  return years.sort((a, b) => a - b);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// РЕНДЕР НАСТРОЕК
+// ══════════════════════════════════════════════════════════════════════
+
+function renderSettings() {
+  let html = '';
+
+  // Отображение
+  html += `<div class="section">
+    <div class="section-header" onclick="toggleSection('s-display')">
+      <div class="section-title"><span class="section-icon">📅</span>Отображение недель</div>
+      <span>▶</span>
+    </div>
+    <div class="section-body" id="s-display">
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px">Режим просмотра:</div>
+      <div class="chip-row">
+        <div class="chip ${currentWeekMode === 'list' ? 'active' : ''}" onclick="currentWeekMode='list';saveDB();render()">Списком</div>
+        <div class="chip ${currentWeekMode === 'pager' ? 'active' : ''}" onclick="currentWeekMode='pager';currentPagerIdx=findInitialWeekIdx();saveDB();render()">По одной</div>
+      </div>
+      <div class="radio-row" onclick="db.scrollToCurrentWeek=!db.scrollToCurrentWeek;saveDB();render()">
+        <div class="radio-dot ${db.scrollToCurrentWeek ? 'checked' : ''}"></div>
+        <span>Открывать к текущей неделе</span>
+      </div>
+    </div>
+  </div>`;
+
+  // Резервная копия
+  html += `<div class="section">
+    <div class="section-header" onclick="toggleSection('s-backup')">
+      <div class="section-title"><span class="section-icon">☁️</span>Резервная копия</div>
+      <span>▶</span>
+    </div>
+    <div class="section-body" id="s-backup">
+      <button class="btn" onclick="exportData()">📤 Экспорт (скачать JSON)</button>
+      <button class="btn" onclick="document.getElementById('import-file').click()">📥 Импорт JSON</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+      <div style="font-size:12px;color:var(--text-dim);margin-top:6px">JSON файл совместим с Android приложением — можно переносить данные между телефоном и браузером.</div>
+    </div>
+  </div>`;
+
+  // Ставки
+  html += `<div class="section">
+    <div class="section-header" onclick="toggleSection('s-salary')">
+      <div class="section-title"><span class="section-icon">💰</span>Ставки зарплаты</div>
+      <span>▶</span>
+    </div>
+    <div class="section-body" id="s-salary">`;
+  if (db.salaryTiers.length === 0) {
+    html += `<div class="empty-msg">Ставок нет</div>`;
+  } else {
+    db.salaryTiers.sort((a,b) => a.startDateEpochDay - b.startDateEpochDay).forEach((t, i) => {
+      html += `<div class="tier-row">
+        <div class="tier-info">
+          <div>С ${formatDateFull(fromEpochDay(t.startDateEpochDay))}</div>
+          <div style="color:var(--text-dim)">до 40ч: ${t.baseRatePerHourKopecks/100} руб/ч  •  сверх: ${t.overtimeRatePerHourKopecks/100} руб/ч</div>
+        </div>
+        <button class="tier-delete" onclick="deleteTier(${i})">Удалить</button>
+      </div>`;
+    });
+  }
+  html += `<button class="btn" style="margin-top:8px" onclick="openModal('tier')">Добавить ставку</button></div></div>`;
+
+  // Отпуск
+  const curVS = db.vacationSettingsList.sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
+  html += `<div class="section">
+    <div class="section-header" onclick="toggleSection('s-vacation')">
+      <div class="section-title"><span class="section-icon">🌴</span>Отпуск</div>
+      <span>▶</span>
+    </div>
+    <div class="section-body" id="s-vacation">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Параметры выплат</div>
+      ${curVS ? `<div style="font-size:13px">Сумма за неделю: ${fmtRub(curVS.weeklyAmountKopecks)}</div>
+        <div style="font-size:13px">Оплачиваемых дней: ${curVS.paidWorkDaysPerYear}</div>` : '<div class="empty-msg">Не настроено</div>'}
+      <button class="btn" style="margin:8px 0" onclick="openVacationSettings()">Изменить параметры</button>
+      <div class="separator"></div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Периоды отпуска</div>`;
+  if (db.vacationPeriods.length === 0) {
+    html += `<div class="empty-msg">Отпусков нет</div>`;
+  } else {
+    db.vacationPeriods.sort((a,b) => a.startDateEpochDay - b.startDateEpochDay).forEach((p, i) => {
+      html += `<div class="tier-row">
+        <div class="tier-info">${formatDateFull(fromEpochDay(p.startDateEpochDay))} – ${formatDateFull(fromEpochDay(p.endDateEpochDay))}</div>
+        <button class="tier-delete" onclick="deleteVacationPeriod(${i})">Удалить</button>
+      </div>`;
+    });
+  }
+  html += `<button class="btn" style="margin-top:8px" onclick="openModal('vacation-period')">Добавить отпуск</button>
+    </div></div>`;
+
+  document.getElementById('tab-settings').innerHTML = html;
+}
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// РЕДАКТИРОВАНИЕ НЕДЕЛИ
+// ══════════════════════════════════════════════════════════════════════
+
+let editingWeekIdx = null;
+
+function openWeekModal(idx) {
+  const week = getWeeksForYear(currentYear)[idx];
+  if (!week) return;
+  editingWeekIdx = idx;
+  document.getElementById('modal-week-title').textContent = `Неделя №${week.weekId} — ${formatDate(week.startDate)} – ${formatDate(week.endDate)}`;
+  let html = `<div style="margin-bottom:12px">
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px">Режим недели:</div>
+    <div class="chip-row">
+      <div class="chip ${week.mode === 'HOURS' ? 'active' : ''}" onclick="setWeekMode(${idx},'HOURS')">Часы</div>
+      <div class="chip ${week.mode === 'FIXED' ? 'active' : ''}" onclick="setWeekMode(${idx},'FIXED')">Фиксированная сумма</div>
+    </div>
+  </div>`;
+  if (week.mode === 'FIXED') {
+    const cur = week.fixedAmountKopecks != null ? week.fixedAmountKopecks / 100 : '';
+    html += `<label>Сумма за неделю (руб)</label><input type="number" id="fixed-amount" value="${cur}" placeholder="5000">`;
+  }
+  document.getElementById('modal-week-content').innerHTML = html;
+  document.getElementById('modal-week').style.display = 'flex';
+}
+
+function setWeekMode(idx, mode) {
+  const weeks = getWeeksForYear(currentYear);
+  weeks[idx].mode = mode;
+  saveDB();
+  openWeekModal(idx);
+}
+
+function saveWeekModal() {
+  const weeks = getWeeksForYear(currentYear);
+  const week = weeks[editingWeekIdx];
+  if (week.mode === 'FIXED') {
+    const val = parseFloat(document.getElementById('fixed-amount')?.value || '0');
+    week.fixedAmountKopecks = isNaN(val) ? null : Math.round(val * 100);
+  }
+  saveDB();
+  closeModal('week');
+  render();
+}
+
+function saveDay(weekIdx, dayIdx, value) {
+  const weeks = getWeeksForYear(currentYear);
+  const week = weeks[weekIdx];
+  if (!week) return;
+  const day = week.days[dayIdx];
+  if (!day) return;
+  const hours = parseFloat(String(value).replace(',', '.'));
+  day.workedMinutes = (isNaN(hours) || value === '') ? null : Math.round(hours * 60);
+  // Sunday always 0
+  if (day.dayIndex === 6 && day.workedMinutes === null) day.workedMinutes = 0;
+  saveDB();
+  render();
+}
+
+function focusNextDay(weekIdx, dayIdx) {
+  if (dayIdx < 5) {
+    const next = document.querySelector(`#cell-${weekIdx}-${dayIdx+1} input`);
+    if (next) { next.focus(); next.select(); }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// НАСТРОЙКИ — СТАВКИ И ОТПУСК
+// ══════════════════════════════════════════════════════════════════════
+
+function saveTier() {
+  const date = document.getElementById('tier-date').value;
+  const base = parseInt(document.getElementById('tier-base').value) || 0;
+  const overtime = parseInt(document.getElementById('tier-overtime').value) || 0;
+  if (!date || base <= 0) { showToast('Заполните все поля'); return; }
+  db.salaryTiers.push({ startDateEpochDay: toEpochDay(date), baseRatePerHourKopecks: base * 100, overtimeRatePerHourKopecks: overtime * 100 });
+  saveDB(); closeModal('tier'); render();
+}
+
+function deleteTier(idx) {
+  if (db.salaryTiers.length <= 1) { showToast('Нельзя удалить последнюю ставку'); return; }
+  db.salaryTiers.splice(idx, 1); saveDB(); render();
+}
+
+function openVacationSettings() {
+  const cur = db.vacationSettingsList.sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
+  document.getElementById('vs-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('vs-weekly').value = cur ? cur.weeklyAmountKopecks / 100 : 18000;
+  document.getElementById('vs-days').value = cur ? cur.paidWorkDaysPerYear : 10;
+  openModal('vacation-settings');
+}
+
+function saveVacationSettings() {
+  const date = document.getElementById('vs-date').value;
+  const weekly = parseInt(document.getElementById('vs-weekly').value) || 0;
+  const days = parseInt(document.getElementById('vs-days').value) || 0;
+  if (!date || weekly <= 0) { showToast('Заполните все поля'); return; }
+  db.vacationSettingsList.push({ startDateEpochDay: toEpochDay(date), weeklyAmountKopecks: weekly * 100, paidWorkDaysPerYear: days });
+  saveDB(); closeModal('vacation-settings'); render();
+}
+
+function saveVacationPeriod() {
+  const start = document.getElementById('vp-start').value;
+  const end = document.getElementById('vp-end').value;
+  if (!start || !end || start > end) { showToast('Проверьте даты'); return; }
+  const vs = db.vacationSettingsList.sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
+  const weekly = vs ? vs.weeklyAmountKopecks : 1800000;
+  db.vacationPeriods.push({
+    startDateEpochDay: toEpochDay(start),
+    endDateEpochDay: toEpochDay(end),
+    lockedWeeklyAmountKopecks: weekly,
+    lockedDailyAmountKopecks: Math.floor(weekly / 5)
+  });
+  saveDB(); closeModal('vacation-period'); render();
+}
+
+function deleteVacationPeriod(idx) {
+  db.vacationPeriods.splice(idx, 1); saveDB(); render();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ИМПОРТ / ЭКСПОРТ (совместимо с Android JSON форматом)
+// ══════════════════════════════════════════════════════════════════════
+
+function exportData() {
+  // Сохраняем в том же формате что и Android приложение
+  const data = {
+    scrollToCurrentWeek: db.scrollToCurrentWeek,
+    weekDisplayMode: currentWeekMode === 'pager' ? 'PAGER' : 'LIST',
+    cardStyle: 'COMPACT',
+    themePreference: 'SYSTEM',
+    lastPagerWeekId: -1,
+    salaryTiers: db.salaryTiers.map(t => ({
+      startDateEpochDay: t.startDateEpochDay,
+      baseRatePerHourKopecks: t.baseRatePerHourKopecks,
+      overtimeRatePerHourKopecks: t.overtimeRatePerHourKopecks
+    })),
+    vacationSettingsList: db.vacationSettingsList.map(v => ({
+      startDateEpochDay: v.startDateEpochDay,
+      weeklyAmountKopecks: v.weeklyAmountKopecks,
+      paidWorkDaysPerYear: v.paidWorkDaysPerYear
+    })),
+    vacationPeriods: db.vacationPeriods.map(p => ({
+      startDateEpochDay: p.startDateEpochDay,
+      endDateEpochDay: p.endDateEpochDay,
+      lockedWeeklyAmountKopecks: p.lockedWeeklyAmountKopecks,
+      lockedDailyAmountKopecks: p.lockedDailyAmountKopecks
+    })),
+    weeksByYear: {}
+  };
+  // Convert weeks to Android format
+  Object.keys(db.weeksByYear).forEach(year => {
+    data.weeksByYear[year] = db.weeksByYear[year].map(w => ({
+      weekId: w.weekId,
+      year: w.year,
+      startDateEpochDay: toEpochDay(w.startDate),
+      endDateEpochDay: toEpochDay(w.endDate),
+      modeName: w.mode,
+      fixedAmountKopecks: w.fixedAmountKopecks,
+      days: w.days.map(d => ({
+        dateEpochDay: toEpochDay(d.dateStr),
+        dayIndex: d.dayIndex,
+        workedMinutes: d.workedMinutes
+      }))
+    }));
+  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `salary_tracker_${currentYear}.json`;
+  a.click();
+  showToast('✅ Файл скачан');
+}
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      // Import salary tiers
+      if (data.salaryTiers) db.salaryTiers = data.salaryTiers;
+      if (data.vacationSettingsList) db.vacationSettingsList = data.vacationSettingsList;
+      if (data.vacationPeriods) db.vacationPeriods = data.vacationPeriods;
+      // Import weeks — convert from Android format
+      if (data.weeksByYear) {
+        db.weeksByYear = {};
+        Object.keys(data.weeksByYear).forEach(year => {
+          db.weeksByYear[year] = data.weeksByYear[year].map(w => ({
+            weekId: w.weekId,
+            year: w.year,
+            startDate: fromEpochDay(w.startDateEpochDay),
+            endDate: fromEpochDay(w.endDateEpochDay),
+            mode: w.modeName || 'HOURS',
+            fixedAmountKopecks: w.fixedAmountKopecks,
+            days: (w.days || []).map(d => ({
+              dateStr: fromEpochDay(d.dateEpochDay),
+              dayIndex: d.dayIndex,
+              workedMinutes: d.dayIndex === 6 && d.workedMinutes === null ? 0 : d.workedMinutes
+            }))
+          }));
+        });
+      }
+      saveDB();
+      render();
+      showToast('✅ Данные импортированы');
+    } catch(err) {
+      showToast('❌ Ошибка импорта');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// МОДАЛЬНЫЕ ОКНА / УТИЛИТЫ
+// ══════════════════════════════════════════════════════════════════════
+
+function openModal(name) {
+  if (name === 'vacation-period') {
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('vp-start').value = today;
+    document.getElementById('vp-end').value = addDays(today, 9);
+  }
+  if (name === 'tier') {
+    document.getElementById('tier-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('tier-base').value = '';
+    document.getElementById('tier-overtime').value = '';
+  }
+  document.getElementById(`modal-${name}`).style.display = 'flex';
+}
+
+function closeModal(name) {
+  document.getElementById(`modal-${name}`).style.display = 'none';
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ГЛАВНЫЙ РЕНДЕР
+// ══════════════════════════════════════════════════════════════════════
+
+function render() {
+  const y = currentYear;
+  document.getElementById('year-label').textContent = `Год: ${y}`;
+  document.getElementById('prev-year').textContent = `◀ ${y - 1}`;
+  document.getElementById('next-year').textContent = `${y + 1} ▶`;
+
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['weeks','stats','settings'][i] === currentTab);
+  });
+
+  document.getElementById('tab-weeks').style.display = currentTab === 'weeks' ? '' : 'none';
+  document.getElementById('tab-stats').style.display = currentTab === 'stats' ? '' : 'none';
+  document.getElementById('tab-settings').style.display = currentTab === 'settings' ? '' : 'none';
+
+  if (currentTab === 'weeks') renderWeeks();
+  if (currentTab === 'stats') renderStats();
+  if (currentTab === 'settings') renderSettings();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ИНИЦИАЛИЗАЦИЯ
+// ══════════════════════════════════════════════════════════════════════
+
+// Показать подсказку установки на iPhone
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.navigator.standalone) {
+  document.getElementById('install-hint').style.display = 'block';
+}
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// Начальный индекс пагера
+currentPagerIdx = findInitialWeekIdx();
+
+render();
+</script>
+</body>
+</html>
