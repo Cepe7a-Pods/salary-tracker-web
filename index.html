@@ -38,6 +38,7 @@
   .tab { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 14px; color: var(--text); cursor: pointer; transition: all .15s; }
   .tab.active { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
   .card { background: var(--surface); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; }
+  .card.current-week { border: 1.5px solid var(--primary); }
   .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: pointer; }
   .card-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
@@ -46,16 +47,21 @@
   .dot-empty { background: var(--text-faint); }
   .dot-vacation { background: var(--green); }
   .card-date { font-size: 12px; color: var(--text-dim); }
-  .days-header { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 4px; }
-  .day-label { text-align: center; font-size: 10px; color: var(--text-dim); }
+  .days-header { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 4px; }
+  .day-label { text-align: center; font-size: 11px; font-weight: 600; color: var(--text); }
   .day-date { text-align: center; font-size: 9px; color: var(--text-faint); }
-  .days-input { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 4px; }
-  .day-cell { background: var(--surface2); border-radius: 4px; height: 34px; border: 1px solid transparent; transition: border .15s; }
-  .day-cell input { width: 100%; height: 100%; background: none; border: none; text-align: center; color: var(--text); font-size: 12px; font-weight: 600; outline: none; padding: 0 2px; }
-  .day-cell input::placeholder { color: var(--text-faint); font-weight: 400; }
+  .days-input { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 4px; }
+  .day-cell { background: var(--surface2); border-radius: 6px; height: 40px; border: 1.5px solid transparent; transition: border .15s; }
+  .day-cell input {
+    width: 100%; height: 100%; background: none; border: none; text-align: center;
+    color: var(--text); font-size: 15px; font-weight: 600; outline: none;
+    padding: 0 1px; -moz-appearance: textfield;
+  }
+  .day-cell input::-webkit-outer-spin-button, .day-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .day-cell input::placeholder { color: var(--text-faint); font-weight: 400; font-size: 16px; }
   .day-cell.focused { border-color: var(--primary); }
-  .days-income { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 6px; }
-  .day-income { text-align: center; font-size: 8px; color: var(--primary); font-weight: 500; }
+  .days-income { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 6px; }
+  .day-income { text-align: center; font-size: 10px; color: var(--primary); font-weight: 500; }
   .day-income.zero { color: var(--text-faint); }
   .total-row { font-size: 13px; font-weight: 600; color: var(--primary); }
   .month-bar { background: var(--surface); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
@@ -197,6 +203,82 @@
 
 <script>
 // ══════════════════════════════════════════════════════════════════════
+// УТИЛИТЫ ДАТ — UTC-SAFE (не зависят от локальной таймзоны устройства)
+// ══════════════════════════════════════════════════════════════════════
+// ВАЖНО: все функции работают только через Date.UTC / getUTC* методы.
+// Использование toISOString() или локальных Date-операций ЗАПРЕЩЕНО —
+// это вызывает сдвиг дат на -1 день в таймзонах с положительным
+// смещением от UTC (вся Европа, Азия и т.д.), что приводило к
+// генерации 62 недель в году вместо 53.
+
+function parseYmd(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return { y, m, d };
+}
+
+function ymdToStr(y, m, d) {
+  return `${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function toEpochDay(dateStr) {
+  const { y, m, d } = parseYmd(dateStr);
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+function fromEpochDay(epochDay) {
+  const dt = new Date(epochDay * 86400000);
+  return ymdToStr(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+}
+
+function addDays(dateStr, n) {
+  return fromEpochDay(toEpochDay(dateStr) + n);
+}
+
+function getDayOfWeek(dateStr) {
+  // Возвращает 1..7 (Пн=1 ... Вс=7)
+  const { y, m, d } = parseYmd(dateStr);
+  const jsDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=Sun..6=Sat
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+function getMondayOfWeek(dateStr) {
+  const dow = getDayOfWeek(dateStr);
+  return addDays(dateStr, -(dow - 1));
+}
+
+function todayStr() {
+  const now = new Date();
+  return ymdToStr(now.getFullYear(), now.getMonth() + 1, now.getDate());
+}
+
+function currentYearNum() {
+  return new Date().getFullYear();
+}
+
+function formatDate(dateStr) {
+  const { y, m, d } = parseYmd(dateStr);
+  return `${String(d).padStart(2,'0')}.${String(m).padStart(2,'0')}.${String(y).slice(2)}`;
+}
+
+function formatDateFull(dateStr) {
+  const { y, m, d } = parseYmd(dateStr);
+  return `${String(d).padStart(2,'0')}.${String(m).padStart(2,'0')}.${y}`;
+}
+
+// Короткая дата для шапки дня внутри карточки — ВСЕГДА ДД.МММ (день.месяц)
+function formatDayDate(dateStr) {
+  const { m, d } = parseYmd(dateStr);
+  return `${String(d).padStart(2,'0')}.${String(m).padStart(2,'0')}`;
+}
+
+function compareDates(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
+function dateInRange(date, start, end) { return date >= start && date <= end; }
+
+const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MONTH_GEN = ['в январе','в феврале','в марте','в апреле','в мае','в июне','в июле','в августе','в сентябре','в октябре','в ноябре','в декабре'];
+const DAY_LABELS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+// ══════════════════════════════════════════════════════════════════════
 // ДАННЫЕ / ХРАНИЛИЩЕ
 // ══════════════════════════════════════════════════════════════════════
 
@@ -223,58 +305,7 @@ function saveDB() {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// УТИЛИТЫ ДАТ
-// ══════════════════════════════════════════════════════════════════════
-
-function toEpochDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return Math.floor(d.getTime() / 86400000);
-}
-
-function fromEpochDay(epochDay) {
-  const d = new Date(epochDay * 86400000);
-  return d.toISOString().slice(0, 10);
-}
-
-function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split('-');
-  return `${d}.${m}.${y.slice(2)}`;
-}
-
-function formatDateFull(dateStr) {
-  const [y, m, d] = dateStr.split('-');
-  return `${d}.${m}.${y}`;
-}
-
-function getDayOfWeek(dateStr) {
-  // 1=Mon, 7=Sun
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.getDay() === 0 ? 7 : d.getDay();
-}
-
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-function getMondayOfWeek(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const dow = d.getDay() === 0 ? 7 : d.getDay();
-  d.setDate(d.getDate() - (dow - 1));
-  return d.toISOString().slice(0, 10);
-}
-
-function compareDates(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
-
-function dateInRange(date, start, end) { return date >= start && date <= end; }
-
-const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-const MONTH_GEN = ['в январе','в феврале','в марте','в апреле','в мае','в июне','в июле','в августе','в сентябре','в октябре','в ноябре','в декабре'];
-const DAY_LABELS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-
-// ══════════════════════════════════════════════════════════════════════
-// ГЕНЕРАЦИЯ НЕДЕЛЬ
+// ГЕНЕРАЦИЯ НЕДЕЛЬ — корректно даёт 52-53 недели на год
 // ══════════════════════════════════════════════════════════════════════
 
 function generateWeeksForYear(year) {
@@ -303,7 +334,7 @@ function getWeeksForYear(year) {
   if (!db.weeksByYear[key]) {
     db.weeksByYear[key] = generateWeeksForYear(year);
   } else {
-    // Патч: воскресенье = 0 если null (для импортированных данных)
+    // Патч: воскресенье = 0 если null (для импортированных старых данных)
     db.weeksByYear[key].forEach(week => {
       week.days.forEach(day => {
         if (day.dayIndex === 6 && day.workedMinutes === null) day.workedMinutes = 0;
@@ -326,15 +357,6 @@ function getActiveTier(date) {
   return tiers[tiers.length - 1] || { baseRatePerHourKopecks: 43000, overtimeRatePerHourKopecks: 55000 };
 }
 
-function getActiveVacationSettings(date) {
-  const list = [...db.vacationSettingsList].sort((a, b) => b.startDateEpochDay - a.startDateEpochDay);
-  const epochDay = toEpochDay(date);
-  for (const s of list) {
-    if (s.startDateEpochDay <= epochDay) return s;
-  }
-  return list[list.length - 1] || { weeklyAmountKopecks: 1800000, paidWorkDaysPerYear: 10 };
-}
-
 function isVacationDay(dateStr) {
   return db.vacationPeriods.some(p => dateInRange(dateStr, fromEpochDay(p.startDateEpochDay), fromEpochDay(p.endDateEpochDay)));
 }
@@ -347,7 +369,7 @@ function calculateWeek(week) {
   if (week.mode === 'FIXED') {
     return { totalIncomeKopecks: week.fixedAmountKopecks || 0, totalWorkedMinutes: 0, dayResults: [] };
   }
-  // Check if vacation week
+  // Проверка: это отпускная неделя?
   const isVacWk = db.vacationPeriods.some(p => {
     const ps = fromEpochDay(p.startDateEpochDay), pe = fromEpochDay(p.endDateEpochDay);
     return week.startDate <= pe && week.endDate >= ps;
@@ -355,7 +377,7 @@ function calculateWeek(week) {
   if (isVacWk) {
     const dayResults = week.days.map(day => {
       const vp = getVacationPeriodForDate(day.dateStr);
-      if (vp && day.dayIndex < 5) { // Mon-Fri only
+      if (vp && day.dayIndex < 5) { // Пн-Пт
         const daily = Math.floor(vp.lockedWeeklyAmountKopecks / 5);
         return { date: day.dateStr, incomeKopecks: daily, workedMinutes: 0 };
       }
@@ -365,7 +387,7 @@ function calculateWeek(week) {
     return { totalIncomeKopecks: totalIncome, totalWorkedMinutes: 0, dayResults };
   }
 
-  // HOURS mode
+  // Режим ЧАСЫ — двойная ставка: до 40ч — baseRate, после 40ч — overtimeRate
   const tier = getActiveTier(week.startDate);
   const totalMinutes = week.days.reduce((s, d) => s + (d.workedMinutes || 0), 0);
   const totalHours = totalMinutes / 60;
@@ -379,7 +401,7 @@ function calculateWeek(week) {
     weekIncomeKopecks = Math.round(40 * baseRate + (totalHours - 40) * overtimeRate);
   }
 
-  // Distribute income proportionally by hours
+  // Распределяем доход недели по дням пропорционально часам (для отображения "доход за день")
   const dayResults = week.days.map(day => {
     const mins = day.workedMinutes || 0;
     let inc = 0;
@@ -431,14 +453,19 @@ function fmtDayIncome(kopecks) {
   return r === 0 ? '0₽' : r + '₽';
 }
 
+function fmtHoursInput(minutes) {
+  if (minutes === null || minutes === undefined) return '';
+  return minutes % 60 === 0 ? String(minutes / 60) : (minutes / 60).toFixed(2);
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // СОСТОЯНИЕ ПРИЛОЖЕНИЯ
 // ══════════════════════════════════════════════════════════════════════
 
-let currentYear = new Date().getFullYear();
+let currentYear = currentYearNum();
 let currentTab = 'weeks';
 let currentPagerIdx = 0;
-let currentWeekMode = 'list'; // 'list' or 'pager'
+let currentWeekMode = db.weekDisplayMode === 'PAGER' ? 'pager' : 'list';
 
 function changeYear(delta) {
   currentYear += delta;
@@ -451,11 +478,13 @@ function switchTab(tab) {
   render();
 }
 
+// Находит индекс недели для автоперехода:
+// - если scrollToCurrentWeek=true и год текущий — текущая неделя
+// - иначе — первая незаполненная (Пн-Сб, без учёта Вс)
 function findInitialWeekIdx() {
   const weeks = getWeeksForYear(currentYear);
-  const today = new Date().toISOString().slice(0, 10);
-  const todayYear = new Date().getFullYear();
-  if (db.scrollToCurrentWeek && currentYear === todayYear) {
+  const today = todayStr();
+  if (db.scrollToCurrentWeek && currentYear === currentYearNum()) {
     const idx = weeks.findIndex(w => today >= w.startDate && today <= w.endDate);
     if (idx >= 0) return idx;
   }
@@ -472,27 +501,38 @@ function findInitialWeekIdx() {
 
 function renderWeeks() {
   const weeks = getWeeksForYear(currentYear);
+  const today = todayStr();
   let html = '';
 
   if (currentWeekMode === 'list') {
-    // Кнопка переключения
-    html += `<button class="btn" style="margin-bottom:10px" onclick="currentWeekMode='pager';currentPagerIdx=findInitialWeekIdx();render()">По одной неделе</button>`;
+    html += `<button class="btn" style="margin-bottom:10px" onclick="currentWeekMode='pager';db.weekDisplayMode='PAGER';currentPagerIdx=findInitialWeekIdx();saveDB();render()">По одной неделе</button>`;
     weeks.forEach((week, idx) => {
-      html += renderWeekCard(week, idx, false);
+      const isCurrent = today >= week.startDate && today <= week.endDate;
+      html += renderWeekCard(week, idx, true, isCurrent);
     });
   } else {
-    html += `<button class="btn" style="margin-bottom:10px" onclick="currentWeekMode='list';render()">Показать списком</button>`;
+    html += `<button class="btn" style="margin-bottom:10px" onclick="currentWeekMode='list';db.weekDisplayMode='LIST';saveDB();render()">Показать списком</button>`;
     html += `<div class="pager-nav">
       <button class="pager-btn" onclick="pagerGo(-1)">◀</button>
       <span class="pager-info">Неделя ${currentPagerIdx + 1} из ${weeks.length}</span>
       <button class="pager-btn" onclick="pagerGo(1)">▶</button>
     </div>`;
     if (weeks[currentPagerIdx]) {
-      html += renderWeekCard(weeks[currentPagerIdx], currentPagerIdx, true);
+      const isCurrent = today >= weeks[currentPagerIdx].startDate && today <= weeks[currentPagerIdx].endDate;
+      html += renderWeekCard(weeks[currentPagerIdx], currentPagerIdx, true, isCurrent);
       html += renderMonthBar(weeks[currentPagerIdx]);
     }
   }
   document.getElementById('tab-weeks').innerHTML = html;
+
+  // Автоскролл к нужной неделе в режиме списка
+  if (currentWeekMode === 'list') {
+    const targetIdx = findInitialWeekIdx();
+    const el = document.getElementById(`week-card-${targetIdx}`);
+    if (el) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'auto', block: 'start' }), 50);
+    }
+  }
 }
 
 function pagerGo(delta) {
@@ -501,7 +541,8 @@ function pagerGo(delta) {
   render();
 }
 
-function renderWeekCard(week, idx, withInput) {
+// withInput — всегда true теперь (и список, и пагер дают вводить часы)
+function renderWeekCard(week, idx, withInput, isCurrent) {
   const status = getWeekStatus(week);
   const result = calculateWeek(week);
   const isVac = status === 'vacation';
@@ -526,41 +567,38 @@ function renderWeekCard(week, idx, withInput) {
     content += `<div class="fixed-badge">Фикс. сумма: ${a}</div>`;
     content += `<div style="font-size:11px;color:var(--text-dim);margin-top:4px">Нажмите на заголовок чтобы изменить</div>`;
   } else {
-    // Days header
-    content += `<div class="days-header">` + week.days.map(d => `<div><div class="day-label">${DAY_LABELS[d.dayIndex]}</div><div class="day-date">${d.dateStr.slice(5).replace('-','.')}</div></div>`).join('') + `</div>`;
-    if (withInput) {
-      // Input cells
-      content += `<div class="days-input">` + week.days.map((d, di) => {
-        const val = d.workedMinutes !== null && d.workedMinutes !== undefined ? (d.workedMinutes % 60 === 0 ? String(d.workedMinutes / 60) : (d.workedMinutes / 60).toFixed(2)) : '';
-        const imeNext = d.dayIndex < 5 ? 'next' : 'done';
-        return `<div class="day-cell" id="cell-${idx}-${di}">
-          <input type="number" inputmode="decimal" step="0.25" min="0" max="24" placeholder="—"
-            value="${val}"
-            onfocus="this.parentElement.classList.add('focused')"
-            onblur="this.parentElement.classList.remove('focused');saveDay(${idx},${di},this.value)"
-            onkeydown="if(event.key==='Enter'){this.blur();${d.dayIndex < 5 ? `focusNextDay(${idx},${di})` : ''}}"
-            enterkeyhint="${imeNext}">
-        </div>`;
-      }).join('') + `</div>`;
-    } else {
-      // Read-only cells
-      content += `<div class="days-input">` + week.days.map(d => {
-        const val = d.workedMinutes !== null ? (d.workedMinutes % 60 === 0 ? String(d.workedMinutes / 60) : (d.workedMinutes / 60).toFixed(2)) : '';
-        return `<div class="day-cell"><input type="number" value="${val}" placeholder="—" readonly style="cursor:default"></div>`;
-      }).join('') + `</div>`;
-    }
-    // Income row
+    // Заголовки дней — ДД.ММ
+    content += `<div class="days-header">` + week.days.map(d =>
+      `<div><div class="day-label">${DAY_LABELS[d.dayIndex]}</div><div class="day-date">${formatDayDate(d.dateStr)}</div></div>`
+    ).join('') + `</div>`;
+
+    // Ячейки ввода — увеличенные, доступны в любом режиме
+    content += `<div class="days-input">` + week.days.map((d, di) => {
+      const val = fmtHoursInput(d.workedMinutes);
+      const isLast = d.dayIndex === 5; // Сб — последний для Done
+      return `<div class="day-cell" id="cell-${idx}-${di}">
+        <input type="number" inputmode="decimal" step="0.25" min="0" max="24" placeholder="—"
+          value="${val}"
+          onfocus="this.parentElement.classList.add('focused')"
+          onblur="this.parentElement.classList.remove('focused');saveDay(${idx},${di},this.value)"
+          onkeydown="if(event.key==='Enter'){this.blur();${d.dayIndex < 5 ? `focusNextDay(${idx},${di})` : ''}}"
+          enterkeyhint="${isLast ? 'done' : 'next'}">
+      </div>`;
+    }).join('') + `</div>`;
+
+    // Доход за день
     content += `<div class="days-income">` + week.days.map(d => {
       const dr = result.dayResults.find(r => r.date === d.dateStr);
       const inc = dr ? dr.incomeKopecks : 0;
       return `<div class="day-income ${inc === 0 ? 'zero' : ''}">${fmtDayIncome(inc)}</div>`;
     }).join('') + `</div>`;
+
     content += `<div class="total-row">Часов: ${fmtHrs(result.totalWorkedMinutes)} • Доход: ${fmtRub(result.totalIncomeKopecks)}</div>`;
   }
 
-  const headerClick = withInput ? `openWeekModal(${idx})` : ``;
-  return `<div class="card">
-    <div class="card-header" onclick="${headerClick}">
+  const currentClass = isCurrent ? ' current-week' : '';
+  return `<div class="card${currentClass}" id="week-card-${idx}">
+    <div class="card-header" onclick="openWeekModal(${idx})">
       <div class="card-title"><div class="dot ${dotClass(status)}"></div>Неделя №${week.weekId}</div>
       <div class="card-date">${formatDate(week.startDate)} – ${formatDate(week.endDate)}</div>
     </div>
@@ -586,16 +624,29 @@ function calcMonthIncome(year, month) {
     const result = calculateWeek(week);
     if (week.mode === 'FIXED') {
       const daysInMonth = week.days.filter(d => {
-        const [dy, dm] = d.dateStr.slice(0,7).split('-').map(Number);
+        const { y: dy, m: dm } = parseYmd(d.dateStr);
         return dy === year && dm === month;
       }).length;
       if (daysInMonth > 0) total += Math.floor(result.totalIncomeKopecks * daysInMonth / 7);
     } else {
       result.dayResults.forEach(dr => {
-        const [dy, dm] = dr.date.slice(0,7).split('-').map(Number);
+        const { y: dy, m: dm } = parseYmd(dr.date);
         if (dy === year && dm === month) total += dr.incomeKopecks;
       });
     }
+  });
+  return total;
+}
+
+function calcMonthMinutes(year, month) {
+  const weeks = getWeeksForYear(year);
+  let total = 0;
+  weeks.forEach(week => {
+    const result = calculateWeek(week);
+    result.dayResults.forEach(dr => {
+      const { y: dy, m: dm } = parseYmd(dr.date);
+      if (dy === year && dm === month) total += dr.workedMinutes;
+    });
   });
   return total;
 }
@@ -612,7 +663,7 @@ function renderStats() {
   });
   html += `</div>`;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   const months = [];
   let totalIncome = 0, totalMinutes = 0, completedCount = 0;
 
@@ -620,7 +671,8 @@ function renderStats() {
     const inc = calcMonthIncome(currentYear, m);
     const mins = calcMonthMinutes(currentYear, m);
     const hasData = inc > 0;
-    const isPast = `${currentYear}-${String(m).padStart(2,'0')}` < today.slice(0, 7);
+    const monthStr = `${currentYear}-${String(m).padStart(2,'0')}`;
+    const isPast = monthStr < today.slice(0, 7);
     const isCompleted = isPast && hasData;
     if (hasData) {
       totalIncome += inc;
@@ -655,31 +707,26 @@ function renderStats() {
   }
 
   document.getElementById('tab-stats').innerHTML = html;
-}
 
-function calcMonthMinutes(year, month) {
-  const weeks = getWeeksForYear(year);
-  let total = 0;
-  weeks.forEach(week => {
-    const result = calculateWeek(week);
-    result.dayResults.forEach(dr => {
-      const [dy, dm] = dr.date.slice(0,7).split('-').map(Number);
-      if (dy === year && dm === month) total += dr.workedMinutes;
-    });
-  });
-  return total;
+  // Автоскролл к текущему году
+  setTimeout(() => {
+    const chip = document.querySelector(`#stat-years .chip.active`);
+    if (chip) chip.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+  }, 50);
 }
 
 function getAvailableYears() {
-  const cur = new Date().getFullYear();
+  const cur = currentYearNum();
   const years = [cur];
   for (let y = 2019; y < cur; y++) {
     const weeks = db.weeksByYear[String(y)];
-    if (!weeks) continue;
-    const hasData = weeks.some(w => {
-      if (w.mode === 'FIXED') return w.fixedAmountKopecks != null;
-      return w.days.some(d => d.dayIndex !== 6 && d.workedMinutes !== null);
-    });
+    let hasData = false;
+    if (weeks) {
+      hasData = weeks.some(w => {
+        if (w.mode === 'FIXED') return w.fixedAmountKopecks != null;
+        return w.days.some(d => d.dayIndex !== 6 && d.workedMinutes !== null);
+      });
+    }
     const hasVac = db.vacationPeriods.some(p => {
       const ps = fromEpochDay(p.startDateEpochDay);
       return ps.startsWith(String(y));
@@ -705,12 +752,15 @@ function renderSettings() {
     <div class="section-body" id="s-display">
       <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px">Режим просмотра:</div>
       <div class="chip-row">
-        <div class="chip ${currentWeekMode === 'list' ? 'active' : ''}" onclick="currentWeekMode='list';saveDB();render()">Списком</div>
-        <div class="chip ${currentWeekMode === 'pager' ? 'active' : ''}" onclick="currentWeekMode='pager';currentPagerIdx=findInitialWeekIdx();saveDB();render()">По одной</div>
+        <div class="chip ${currentWeekMode === 'list' ? 'active' : ''}" onclick="currentWeekMode='list';db.weekDisplayMode='LIST';saveDB();render()">Списком</div>
+        <div class="chip ${currentWeekMode === 'pager' ? 'active' : ''}" onclick="currentWeekMode='pager';db.weekDisplayMode='PAGER';currentPagerIdx=findInitialWeekIdx();saveDB();render()">По одной</div>
       </div>
-      <div class="radio-row" onclick="db.scrollToCurrentWeek=!db.scrollToCurrentWeek;saveDB();render()">
+      <div class="radio-row" onclick="db.scrollToCurrentWeek=!db.scrollToCurrentWeek;saveDB();currentPagerIdx=findInitialWeekIdx();render()">
         <div class="radio-dot ${db.scrollToCurrentWeek ? 'checked' : ''}"></div>
         <span>Открывать к текущей неделе</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:4px">
+        ${db.scrollToCurrentWeek ? 'Переход к текущей неделе (работает в обоих режимах)' : 'Переход к первой незаполненной неделе'}
       </div>
     </div>
   </div>`;
@@ -739,20 +789,21 @@ function renderSettings() {
   if (db.salaryTiers.length === 0) {
     html += `<div class="empty-msg">Ставок нет</div>`;
   } else {
-    db.salaryTiers.sort((a,b) => a.startDateEpochDay - b.startDateEpochDay).forEach((t, i) => {
+    [...db.salaryTiers].sort((a,b) => a.startDateEpochDay - b.startDateEpochDay).forEach((t) => {
+      const realIdx = db.salaryTiers.indexOf(t);
       html += `<div class="tier-row">
         <div class="tier-info">
           <div>С ${formatDateFull(fromEpochDay(t.startDateEpochDay))}</div>
           <div style="color:var(--text-dim)">до 40ч: ${t.baseRatePerHourKopecks/100} руб/ч  •  сверх: ${t.overtimeRatePerHourKopecks/100} руб/ч</div>
         </div>
-        <button class="tier-delete" onclick="deleteTier(${i})">Удалить</button>
+        <button class="tier-delete" onclick="deleteTier(${realIdx})">Удалить</button>
       </div>`;
     });
   }
   html += `<button class="btn" style="margin-top:8px" onclick="openModal('tier')">Добавить ставку</button></div></div>`;
 
   // Отпуск
-  const curVS = db.vacationSettingsList.sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
+  const curVS = [...db.vacationSettingsList].sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
   html += `<div class="section">
     <div class="section-header" onclick="toggleSection('s-vacation')">
       <div class="section-title"><span class="section-icon">🌴</span>Отпуск</div>
@@ -768,10 +819,11 @@ function renderSettings() {
   if (db.vacationPeriods.length === 0) {
     html += `<div class="empty-msg">Отпусков нет</div>`;
   } else {
-    db.vacationPeriods.sort((a,b) => a.startDateEpochDay - b.startDateEpochDay).forEach((p, i) => {
+    [...db.vacationPeriods].sort((a,b) => a.startDateEpochDay - b.startDateEpochDay).forEach((p) => {
+      const realIdx = db.vacationPeriods.indexOf(p);
       html += `<div class="tier-row">
         <div class="tier-info">${formatDateFull(fromEpochDay(p.startDateEpochDay))} – ${formatDateFull(fromEpochDay(p.endDateEpochDay))}</div>
-        <button class="tier-delete" onclick="deleteVacationPeriod(${i})">Удалить</button>
+        <button class="tier-delete" onclick="deleteVacationPeriod(${realIdx})">Удалить</button>
       </div>`;
     });
   }
@@ -839,7 +891,7 @@ function saveDay(weekIdx, dayIdx, value) {
   if (!day) return;
   const hours = parseFloat(String(value).replace(',', '.'));
   day.workedMinutes = (isNaN(hours) || value === '') ? null : Math.round(hours * 60);
-  // Sunday always 0
+  // Воскресенье всегда 0
   if (day.dayIndex === 6 && day.workedMinutes === null) day.workedMinutes = 0;
   saveDB();
   render();
@@ -871,8 +923,8 @@ function deleteTier(idx) {
 }
 
 function openVacationSettings() {
-  const cur = db.vacationSettingsList.sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
-  document.getElementById('vs-date').value = new Date().toISOString().slice(0, 10);
+  const cur = [...db.vacationSettingsList].sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
+  document.getElementById('vs-date').value = todayStr();
   document.getElementById('vs-weekly').value = cur ? cur.weeklyAmountKopecks / 100 : 18000;
   document.getElementById('vs-days').value = cur ? cur.paidWorkDaysPerYear : 10;
   openModal('vacation-settings');
@@ -891,7 +943,7 @@ function saveVacationPeriod() {
   const start = document.getElementById('vp-start').value;
   const end = document.getElementById('vp-end').value;
   if (!start || !end || start > end) { showToast('Проверьте даты'); return; }
-  const vs = db.vacationSettingsList.sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
+  const vs = [...db.vacationSettingsList].sort((a,b) => b.startDateEpochDay - a.startDateEpochDay)[0];
   const weekly = vs ? vs.weeklyAmountKopecks : 1800000;
   db.vacationPeriods.push({
     startDateEpochDay: toEpochDay(start),
@@ -911,7 +963,6 @@ function deleteVacationPeriod(idx) {
 // ══════════════════════════════════════════════════════════════════════
 
 function exportData() {
-  // Сохраняем в том же формате что и Android приложение
   const data = {
     scrollToCurrentWeek: db.scrollToCurrentWeek,
     weekDisplayMode: currentWeekMode === 'pager' ? 'PAGER' : 'LIST',
@@ -936,7 +987,6 @@ function exportData() {
     })),
     weeksByYear: {}
   };
-  // Convert weeks to Android format
   Object.keys(db.weeksByYear).forEach(year => {
     data.weeksByYear[year] = db.weeksByYear[year].map(w => ({
       weekId: w.weekId,
@@ -967,11 +1017,14 @@ function importData(input) {
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      // Import salary tiers
       if (data.salaryTiers) db.salaryTiers = data.salaryTiers;
       if (data.vacationSettingsList) db.vacationSettingsList = data.vacationSettingsList;
       if (data.vacationPeriods) db.vacationPeriods = data.vacationPeriods;
-      // Import weeks — convert from Android format
+      if (typeof data.scrollToCurrentWeek === 'boolean') db.scrollToCurrentWeek = data.scrollToCurrentWeek;
+      if (data.weekDisplayMode) {
+        db.weekDisplayMode = data.weekDisplayMode;
+        currentWeekMode = data.weekDisplayMode === 'PAGER' ? 'pager' : 'list';
+      }
       if (data.weeksByYear) {
         db.weeksByYear = {};
         Object.keys(data.weeksByYear).forEach(year => {
@@ -991,6 +1044,7 @@ function importData(input) {
         });
       }
       saveDB();
+      currentPagerIdx = findInitialWeekIdx();
       render();
       showToast('✅ Данные импортированы');
     } catch(err) {
@@ -1007,12 +1061,12 @@ function importData(input) {
 
 function openModal(name) {
   if (name === 'vacation-period') {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayStr();
     document.getElementById('vp-start').value = today;
     document.getElementById('vp-end').value = addDays(today, 9);
   }
   if (name === 'tier') {
-    document.getElementById('tier-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('tier-date').value = todayStr();
     document.getElementById('tier-base').value = '';
     document.getElementById('tier-overtime').value = '';
   }
@@ -1059,17 +1113,14 @@ function render() {
 // ИНИЦИАЛИЗАЦИЯ
 // ══════════════════════════════════════════════════════════════════════
 
-// Показать подсказку установки на iPhone
 if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.navigator.standalone) {
   document.getElementById('install-hint').style.display = 'block';
 }
 
-// Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
-// Начальный индекс пагера
 currentPagerIdx = findInitialWeekIdx();
 
 render();
